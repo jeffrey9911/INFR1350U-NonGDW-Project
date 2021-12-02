@@ -475,15 +475,15 @@ void CreateScene() {
 		// Light 9 follows puck
 
 		// l1
-		scene->Lights[1].Range = 0.0f;
-		scene->Lights[2].Range = 0.0f;
-		scene->Lights[3].Range = 0.0f;
-		scene->Lights[4].Range = 0.0f;
-		scene->Lights[5].Range = 0.0f;
-		scene->Lights[6].Range = 0.0f;
-		scene->Lights[7].Range = 0.0f;
-		scene->Lights[8].Range = 0.0f;
-		scene->Lights[9].Range = 10.0f;
+		scene->Lights[1].Range = 2.0f;
+		scene->Lights[2].Range = 2.0f;
+		scene->Lights[3].Range = 2.0f;
+		scene->Lights[4].Range = 2.0f;
+		scene->Lights[5].Range = 2.0f;
+		scene->Lights[6].Range = 2.0f;
+		scene->Lights[7].Range = 2.0f;
+		scene->Lights[8].Range = 2.0f;
+		scene->Lights[9].Range = -13.0f;
 
 		scene->Lights[1].Color = black;
 		scene->Lights[2].Color = black;
@@ -493,7 +493,7 @@ void CreateScene() {
 		scene->Lights[6].Color = black;
 		scene->Lights[7].Color = black;
 		scene->Lights[8].Color = black;
-		scene->Lights[9].Color = yellow;
+		scene->Lights[9].Color = glm::vec3(0.043f, 0.043f, 0.0f);
 		
 		scene->Lights[1].Position = glm::vec3(-14.840f, 13.340f, -6.560f);
 		scene->Lights[2].Position = glm::vec3(-14.720f, -12.980f, -6.620f);
