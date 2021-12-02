@@ -113,28 +113,8 @@ using namespace Gameplay::Physics;
 // The scene that we will be rendering
 Scene::Sptr scene = nullptr;
 
-double f0_cursorPosX, f0_cursorPosY;
-Guid myID;
-std::vector<Guid> edgeID;
 
-void scoreCheck(bool isLeft);
-void scoreCheckReset();
-void checkIsReseting();
-// Global scoring
-int leftScore[4] = { 0, 0, 0, 0 };
-int leftScoreInd[4] = { 0, 1, 2, 3 };
-int rightScore[4] = { 0, 0, 0, 0 };
-int rightScoreInd[4] = { 4, 5, 6, 7 };
-glm::vec3 black = glm::vec3(0.0f);
-glm::vec3 yellow = glm::vec3(1.0f, 1.0f, 0.0f);
 
-int lScore = -1;
-int rScore = -1;
-
-bool resetCheck = false;
-bool isWin = false;
-std::vector<Light> scoreLight;
-Light puckLight;
 
 void GlfwWindowResizedCallback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
@@ -253,6 +233,10 @@ void DrawMaterialsWindow() {
 /// <summary>
 /// handles creating or loading the scene
 /// </summary>
+/// 
+glm::vec3 black = glm::vec3(0.0f);
+glm::vec3 yellow = glm::vec3(1.0f, 1.0f, 0.0f);
+std::vector<Guid> edgeID;
 void CreateScene() {
 	bool loadScene = false;
 	// For now we can use a toggle to generate our scene vs load from file
@@ -301,13 +285,12 @@ void CreateScene() {
 
 
 		// Load in the meshes
-		MeshResource::Sptr monkeyMesh = ResourceManager::CreateAsset<MeshResource>("Monkey.obj");
-
 		//// Table
 		MeshResource::Sptr mesh_table = ResourceManager::CreateAsset<MeshResource>("gObj_table/table.obj");
 		MeshResource::Sptr mesh_table_plane = ResourceManager::CreateAsset<MeshResource>("gObj_table/table_plane.obj");
 		Texture2D::Sptr tex_table = ResourceManager::CreateAsset<Texture2D>("gObj_table/tex_table.png");
-		Texture2D::Sptr tex_white = ResourceManager::CreateAsset<Texture2D>("gObj_table/blankTexture.jpg");
+		Texture2D::Sptr tex_white = ResourceManager::CreateAsset<Texture2D>("textures/blankTexture.jpg");
+		Texture2D::Sptr tex_black = ResourceManager::CreateAsset<Texture2D>("textures/blackTexture.jpg");
 
 		//// Puck
 		MeshResource::Sptr mesh_puck = ResourceManager::CreateAsset<MeshResource>("gObj_puck/puck.obj");
@@ -318,7 +301,7 @@ void CreateScene() {
 		MeshResource::Sptr mesh_paddle2 = ResourceManager::CreateAsset<MeshResource>("gObj_paddle/paddle.obj");
 		Texture2D::Sptr tex_paddle_red = ResourceManager::CreateAsset<Texture2D>("gObj_paddle/Red.jpg");
 		Texture2D::Sptr tex_paddle_blue = ResourceManager::CreateAsset<Texture2D>("gObj_paddle/Blue.jpg");
-
+		 
 		//// Edge
 		MeshResource::Sptr mesh_edge1 = ResourceManager::CreateAsset<MeshResource>("gObj_edge/edge_uni.obj");
 		MeshResource::Sptr mesh_edge2 = ResourceManager::CreateAsset<MeshResource>("gObj_edge/edge_uni.obj");
@@ -342,12 +325,13 @@ void CreateScene() {
 		MeshResource::Sptr mesh_edgeMask = ResourceManager::CreateAsset<MeshResource>("gObj_edge/bagua.obj");
 
 		// Load in some textures
+		/*
 		Texture2D::Sptr    boxTexture = ResourceManager::CreateAsset<Texture2D>("textures/box-diffuse.png");
 		Texture2D::Sptr    boxSpec = ResourceManager::CreateAsset<Texture2D>("textures/box-specular.png");
 		Texture2D::Sptr    monkeyTex = ResourceManager::CreateAsset<Texture2D>("textures/monkey-uvMap.png");
 		Texture2D::Sptr    leafTex = ResourceManager::CreateAsset<Texture2D>("textures/leaves.png");
 		leafTex->SetMinFilter(MinFilter::Nearest);
-		leafTex->SetMagFilter(MagFilter::Nearest);
+		leafTex->SetMagFilter(MagFilter::Nearest);*/
 
 		// Here we'll load in the cubemap, as well as a special shader to handle drawing the skybox
 		TextureCube::Sptr testCubemap = ResourceManager::CreateAsset<TextureCube>("cubemaps/ocean/ocean.jpg");
@@ -366,60 +350,19 @@ void CreateScene() {
 		scene->SetSkyboxRotation(glm::rotate(MAT4_IDENTITY, glm::half_pi<float>(), glm::vec3(1.0f, 0.0f, 0.0f)));
 
 		// Create our materials
-		// This will be our box material, with no environment reflections
-		Material::Sptr boxMaterial = ResourceManager::CreateAsset<Material>(basicShader);
-		{
-			boxMaterial->Name = "Box";
-			boxMaterial->Set("u_Material.Diffuse", boxTexture);
-			boxMaterial->Set("u_Material.Shininess", 0.1f);
-		}
-
-		// This will be the reflective material, we'll make the whole thing 90% reflective
-		Material::Sptr monkeyMaterial = ResourceManager::CreateAsset<Material>(reflectiveShader);
-		{
-			monkeyMaterial->Name = "Monkey";
-			monkeyMaterial->Set("u_Material.Diffuse", monkeyTex);
-			monkeyMaterial->Set("u_Material.Shininess", 0.5f);
-		}
-
-		// This will be the reflective material, we'll make the whole thing 90% reflective
-		Material::Sptr testMaterial = ResourceManager::CreateAsset<Material>(specShader);
-		{
-			testMaterial->Name = "Box-Specular";
-			testMaterial->Set("u_Material.Diffuse", boxTexture);
-			testMaterial->Set("u_Material.Specular", boxSpec);
-		}
-
-		/////////////// NEW MATERIALS ////////////////////
-
-		// Our foliage vertex shader material
-		Material::Sptr foliageMaterial = ResourceManager::CreateAsset<Material>(foliageShader);
-		{
-			foliageMaterial->Name = "Foliage Shader";
-			foliageMaterial->Set("u_Material.Diffuse", leafTex);
-			foliageMaterial->Set("u_Material.Shininess", 0.1f);
-			foliageMaterial->Set("u_Material.Threshold", 0.1f);
-
-			foliageMaterial->Set("u_WindDirection", glm::vec3(1.0f, 1.0f, 0.0f));
-			foliageMaterial->Set("u_WindStrength", 0.5f);
-			foliageMaterial->Set("u_VerticalScale", 1.0f);
-			foliageMaterial->Set("u_WindSpeed", 1.0f);
-		}
-
-		// Our toon shader material
-		Material::Sptr toonMaterial = ResourceManager::CreateAsset<Material>(toonShader);
-		{
-			toonMaterial->Name = "Toon";
-			toonMaterial->Set("u_Material.Diffuse", boxTexture);
-			toonMaterial->Set("u_Material.Shininess", 0.1f);
-			toonMaterial->Set("u_Material.Steps", 8);
-		}
-
+		
 		Material::Sptr material_white = ResourceManager::CreateAsset<Material>(basicShader);
 		{
 			material_white->Name = "White";
 			material_white->Set("u_Material.Diffuse", tex_white);
 			material_white->Set("u_Material.Shininess", 256.0f);
+		}
+
+		Material::Sptr material_black = ResourceManager::CreateAsset<Material>(basicShader);
+		{
+			material_black->Name = "Black";
+			material_black->Set("u_Material.Diffuse", tex_black);
+			material_black->Set("u_Material.Shininess", 10.0f);
 		}
 
 
@@ -506,11 +449,6 @@ void CreateScene() {
 		scene->Lights[8].Position = glm::vec3(4.540f, -15.540f, -6.570f);
 
 		scene->Lights[9].Position = glm::vec3(0.0f, 0.0f, 10.0f);
-
-		for (int i = 1; i < 9; i++)
-		{
-			scoreLight.push_back(scene->Lights[i]);
-		}
 
 		// We'll create a mesh that is a simple plane that we can resize later
 		MeshResource::Sptr planeMesh = ResourceManager::CreateAsset<MeshResource>();
@@ -752,6 +690,8 @@ void CreateScene() {
 		}
 		//// Edge
 #pragma region 12 Edges
+		//RigidBody::Sptr edgePhys;
+
 		GameObject::Sptr gObj_edge1 = scene->CreateGameObject("Edge");
 		{
 			edgeID.push_back(gObj_edge1->GUID);
@@ -762,12 +702,12 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge1);
 			renderer->SetMaterial(material_white);
 
-			//TriggerVolume::Sptr volume = gObj_edge1->Add<TriggerVolume>();
-			BounceBehaviour::Sptr bounce = gObj_edge1->Add<BounceBehaviour>();
-			TriggerVolume::Sptr volume = bounce->AddComponent<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(2.980f, 1.0f, 1.0f));
+			TriggerVolume::Sptr volume = gObj_edge1->Add<TriggerVolume>();
+			RigidBody::Sptr physics = gObj_edge1->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(2.980f, 1.0f, 3.0f));
 		}
+		
+
 		GameObject::Sptr gObj_edge2 = scene->CreateGameObject("Edge");
 		{
 			edgeID.push_back(gObj_edge2->GUID);
@@ -778,10 +718,19 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge2);
 			renderer->SetMaterial(material_white);
 
+			/*
 			TriggerVolume::Sptr volume = gObj_edge2->Add<TriggerVolume>();
 			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(2.980f, 1.0f, 1.0f));
+			collider->SetScale(glm::vec3(2.980f, 1.0f, 3.0f));*/
+
+			TriggerVolume::Sptr volume = gObj_edge2->Add<TriggerVolume>();
+			RigidBody::Sptr physics = gObj_edge2->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(2.980f, 1.0f, 3.0f)
+				);
 		}
+		
+
 		GameObject::Sptr gObj_edge3 = scene->CreateGameObject("Edge");
 		{
 			edgeID.push_back(gObj_edge3->GUID);
@@ -792,9 +741,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge3);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge3->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(5.080f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge3->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(5.080f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge3->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(5.080f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge4 = scene->CreateGameObject("Edge");
 		{
@@ -806,9 +761,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge4);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge4->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(5.080f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge4->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(5.080f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge4->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(5.080f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge5 = scene->CreateGameObject("Edge");
 		{
@@ -821,9 +782,15 @@ void CreateScene() {
 			renderer->SetMaterial(material_white);
 
 
+			//TriggerVolume::Sptr volume = gObj_edge5->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(4.430f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge5->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(4.430f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge5->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(4.430f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge6 = scene->CreateGameObject("Edge");
 		{
@@ -835,9 +802,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge6);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge6->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(4.430f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge6->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(4.430f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge6->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(4.430f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge7 = scene->CreateGameObject("Edge");
 		{
@@ -850,9 +823,15 @@ void CreateScene() {
 			renderer->SetMaterial(material_white);
 
 
+			//TriggerVolume::Sptr volume = gObj_edge7->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(4.430f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge7->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(4.430f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge7->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(4.430f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge8 = scene->CreateGameObject("Edge");
 		{
@@ -864,9 +843,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge8);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge8->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(4.430f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge8->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(4.430f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge8->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(4.430f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge9 = scene->CreateGameObject("Edge");
 		{
@@ -878,9 +863,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge9);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge9->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(5.080f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge9->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(5.080f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge9->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(5.080f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge10 = scene->CreateGameObject("Edge");
 		{
@@ -892,9 +883,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge10);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge10->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(5.080f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge10->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(5.080f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge10->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(5.080f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge11 = scene->CreateGameObject("Edge");
 		{
@@ -906,9 +903,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge11);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge11->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(2.980f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge11->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(2.980f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge11->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(2.980f, 1.0f, 3.0f)
+				);
 		}
 		GameObject::Sptr gObj_edge12 = scene->CreateGameObject("Edge");
 		{
@@ -920,9 +923,15 @@ void CreateScene() {
 			renderer->SetMesh(mesh_edge12);
 			renderer->SetMaterial(material_white);
 
+			//TriggerVolume::Sptr volume = gObj_edge12->Add<TriggerVolume>();
+			//ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
+			//collider->SetScale(glm::vec3(2.980f, 1.0f, 3.0f));
+
 			TriggerVolume::Sptr volume = gObj_edge12->Add<TriggerVolume>();
-			ICollider::Sptr collider = volume->AddCollider(ConvexMeshCollider::Create());
-			collider->SetScale(glm::vec3(2.980f, 1.0f, 1.0f));
+			RigidBody::Sptr physics = gObj_edge12->Add<RigidBody>(RigidBodyType::Static);
+			volume->AddCollider(
+				physics->AddCollider(ConvexMeshCollider::Create()))->SetScale(glm::vec3(2.980f, 1.0f, 3.0f)
+				);
 		}
 
 
@@ -974,7 +983,7 @@ void CreateScene() {
 
 			RenderComponent::Sptr renderer = gObj_edgeMask->Add<RenderComponent>();
 			renderer->SetMesh(mesh_edgeMask);
-			renderer->SetMaterial(material_edge);
+			renderer->SetMaterial(material_black);
 		}
 
 		//// Plane 
@@ -993,6 +1002,23 @@ void CreateScene() {
 		scene->Save("scene.json");
 	}
 }
+
+double f0_cursorPosX, f0_cursorPosY;
+Guid myID;
+
+
+void scoreCheck(bool isLeft);
+void scoreCheckReset();
+void checkIsReseting();
+void lightReset();
+
+
+
+int lScore = 0;
+int rScore = 0;
+
+bool resetCheck = false;
+bool isWin = false;
 
 int main() {
 	Logger::Init(); // We'll borrow the logger from the toolkit, but we need to initialize it
@@ -1289,13 +1315,13 @@ int main() {
 			countDown -= dt;
 
 
-
+		/*
 		if (gObj_puck->Get<BounceBehaviour>()->isInCollision && countDown <= 0)
 		{
 			rigid_puck->resetVelocity();
 			rigid_puck->ApplyImpulse(gObj_puck->Get<BounceBehaviour>()->repelVelocity);
 			countDown = 1;
-		}
+		}*/
 
 		
 
@@ -1402,39 +1428,6 @@ int main() {
 		scene->Lights[9].Position = glm::vec3(gObj_puck->GetPosition().x, gObj_puck->GetPosition().y, gObj_puck->GetPosition().z + 3.0f);
 		
 
-		//std::cout << " " << scene->Lights.begin()[0] << std::endl;
-
-		/*
-		for (int ix = 1; ix < scene->Lights.size(); ix++)
-		{
-			scene->Lights.erase(scene->Lights.begin() + ix);
-
-		}
-		scene->SetupShaderAndLights();
-		*/
-
-		if (lScore > -1)
-		{
-			scene->Lights[lScore].Color = yellow;
-
-			/*
-			for (int i = -1; i < lScore; i++)
-			{
-				scene->Lights.push_back(scoreLight[i + 1]);
-				scene->SetupShaderAndLights();
-			}*/
-		}
-		if (rScore > -1)
-		{
-			scene->Lights[lScore + 5].Color = yellow;
-			/*
-			for (int i = -1; i < rScore; i++)
-			{
-				scene->Lights.push_back(scoreLight[i + 5]);
-				scene->SetupShaderAndLights();
-			}*/
-		}
-
 
 		scene->SetupShaderAndLights();
 		// Use our cubemap to draw our skybox
@@ -1464,36 +1457,30 @@ int main() {
 void scoreCheck(bool isLeft) {
 	if (isLeft) {
 		lScore += 1;
+		scene->Lights[lScore].Color = yellow;
 	}
 	else
 	{
 		rScore += 1;
+		scene->Lights[rScore + 4].Color = yellow;
 	}
 }
 
 void scoreCheckReset() {
-	if (lScore >= 3)
+	if (lScore >= 4)
 	{
 		std::cout << "Red Player Wins !!!!!!!!!" << std::endl;
 
-		lScore = -1;
-		rScore = -1;
-		for (int i = 1; i < 9; i++)
-		{
-			scene->Lights[i].Color = black;
-		}
+		lScore = 0;
+		rScore = 0;
 		resetCheck = true;
 	}
-	if (rScore >= 3)
+	if (rScore >= 4)
 	{
 		std::cout << "Blue Player Wins !!!!!!!!!" << std::endl;
 
-		lScore = -1;
-		rScore = -1;
-		for (int i = 1; i < 9; i++)
-		{
-			scene->Lights[i].Color = black;
-		}
+		lScore = 0;
+		rScore = 0;
 		resetCheck = true;
 	}
 }
@@ -1503,7 +1490,16 @@ void checkIsReseting() {
 	if (resetCheck == true) {
 		std::cout << "RESETING GAME!!!!!" << std::endl;
 		gObj_puck->SetPostion(glm::vec3(0.0f, 0.0f, 4.0f));
+		lightReset();
 		resetCheck = false;
 		Sleep(1000);
+	}
+}
+
+void lightReset()
+{
+	for (int i = 1; i < 9; i++)
+	{
+		scene->Lights[i].Color = black;
 	}
 }
